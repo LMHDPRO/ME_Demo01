@@ -85,4 +85,6 @@ public class GhostFollower : MonoBehaviour
         Collider2D hit = Physics2D.OverlapCircle(position, checkRadius, obstacleLayer);
         return hit != null;
     }
+
+
 }

@@ -2,62 +2,77 @@ using UnityEngine;
 
 public class Companion_V2 : MonoBehaviour
 {
-    public Transform player; // Referencia al jugador
-    public float speed = 3f; // Velocidad de movimiento
-    public float followDistance = 1f; // Distancia m�nima antes de moverse
-    public float jumpForce = 5f; // Fuerza del salto
+    public GameObject player;
+    public float speed = 3f;
+    public float followDistance = 1f;
+    public float deathDistance = 100f;
+    public float jumpForce = 5f;
     public float reviveDistance = 2f;
-    public LayerMask groundLayer; // Capa del suelo para detectar saltos
-    public GameObject ghost; // Referencia al objeto Ghost
+    public LayerMask groundLayer;
+    public GameObject ghost;
 
     private Rigidbody2D rb;
-    public SpriteRenderer spriteRenderer;
+    [SerializeField] private SpriteRenderer spriteRenderer;
+    [SerializeField] private SpriteRenderer ghostSpriteRenderer;
     private bool isGrounded;
     public bool isDead;
 
+    private float groundCheckDistance = 1.2f;
+    private float obstacleCheckDistance = 1f;
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         isDead = false;
+        Collider2D col1 = GetComponent<Collider2D>();
+        Collider2D col2 = player.GetComponent<Collider2D>();
+
+        if (col1 != null && col2 != null)
+        {
+            Physics2D.IgnoreCollision(col1, col2, true);
+        }
     }
 
     void Update()
     {
         if (player == null) return;
-        MakeOpaque();
-        float distanceToPlayer = Vector2.Distance(transform.position, player.position);
-        float distanceGhostToPlayer = Vector2.Distance(ghost.transform.position, player.position);
-        if (!isDead){
-            spriteRenderer.enabled = true;
+
+        float distanceToPlayer = Vector2.Distance(transform.position, player.transform.position);
+        float distanceGhostToPlayer = Vector2.Distance(ghost.transform.position, player.transform.position);
+
+        if (!isDead)
+        {
             if (distanceToPlayer > followDistance)
             {
-                Vector2 direction = (player.position - transform.position).normalized;
+                Vector2 direction = (player.transform.position - transform.position).normalized;
                 rb.linearVelocity = new Vector2(direction.x * speed, rb.linearVelocity.y);
             }
             else
             {
-
                 rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
             }
+            if (distanceToPlayer > deathDistance)
+            {
+                Die();
+            }
+            // Comprobación de suelo
+            isGrounded = Physics2D.Raycast(transform.position, Vector2.down, groundCheckDistance, groundLayer);
+            Debug.DrawRay(transform.position, Vector2.down * groundCheckDistance, Color.red);
 
-            // Verificar si est� en el suelo antes de saltar
-            isGrounded = Physics2D.Raycast(transform.position, Vector2.down, 1.2f, groundLayer);
-
-            // Intentar saltar si hay un obstaculo delante
+            // Detectar si hay un obstáculo enfrente
             if (isGrounded && CheckForObstacle())
             {
                 Jump();
             }
         }
-        else{
-            if(distanceGhostToPlayer < reviveDistance) {
+        else
+        {
+            if (distanceGhostToPlayer < reviveDistance)
+            {
                 HandleReviveState();
             }
-       
-        
+        }
     }
-    
 
     void Jump()
     {
@@ -66,49 +81,48 @@ public class Companion_V2 : MonoBehaviour
 
     bool CheckForObstacle()
     {
-        // Dispara un rayo hacia adelante para detectar obst�culos
-        RaycastHit2D hit = Physics2D.Raycast(transform.position, Vector2.right * Mathf.Sign(rb.linearVelocity.x), 0.6f, groundLayer);
+        if (Mathf.Abs(rb.linearVelocity.x) < 0.1f) return false;
+
+        Vector2 direction = Vector2.right * Mathf.Sign(rb.linearVelocity.x);
+        RaycastHit2D hit = Physics2D.Raycast(transform.position + Vector3.up * 0.5f, direction, obstacleCheckDistance, groundLayer);
+        Debug.DrawRay(transform.position + Vector3.up * 0.5f, direction * obstacleCheckDistance, Color.blue);
+
         return hit.collider != null;
-    }
     }
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
         if (collision.CompareTag("Hazard"))
         {
-            //AL TOCAR UN OBJETO CON ESE TAG ACTIVA MUERTE
-            Debug.Log("Muertepordaño");
+            Debug.Log("Muerte por daño");
             Die();
         }
     }
+
     public void Die()
     {
-        // Teletransportar al Ghost a la posición del NPC
         if (ghost != null)
         {
             isDead = true;
             ghost.transform.position = transform.position;
-            MakeTransparent();
+            HideSprite();
         }
     }
 
-    private void MakeTransparent()
+    private void HideSprite()
     {
-        Color spriteColor = spriteRenderer.color;
-        spriteColor.a = 0.00001f;
-        spriteRenderer.color = spriteColor;
+        spriteRenderer.enabled = false;
+        ghostSpriteRenderer.enabled = true;
     }
 
     private void MakeOpaque()
     {
-        Color spriteColor = spriteRenderer.color;
-        spriteColor.a = 1f;
-        spriteRenderer.color = spriteColor;
+        spriteRenderer.enabled = true;
+        ghostSpriteRenderer.enabled = false;
     }
 
     public void HandleReviveState()
     {
-        //SI LLEGA A DONDE ESTÁ EL JUGADOR AQUÍ RE-ACTIVA SUS PROPIEDADES ORIGINALES
         isDead = false;
         MakeOpaque();
     }
